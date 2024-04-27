@@ -15,23 +15,30 @@ import (
 
 // VirtualTun stores a reference to netstack network and DNS configuration
 type VirtualTun struct {
-	Tnet      *netstack.Net
-	Logger    *slog.Logger
-	Dev       *device.Device
-	Ctx       context.Context
+	Tnet   *netstack.Net
+	Logger *slog.Logger
+	Dev    *device.Device
+	Ctx    context.Context
 }
 
 // StartProxy spawns a socks5 server.
-func (vt *VirtualTun) StartProxy(bindAddress netip.AddrPort) (netip.AddrPort, error) {
+func StartProxy(ctx context.Context, l *slog.Logger, tnet *netstack.Net, bindAddress netip.AddrPort) (netip.AddrPort, error) {
 	ln, err := net.Listen("tcp", bindAddress.String())
 	if err != nil {
 		return netip.AddrPort{}, err // Return error if binding was unsuccessful
 	}
 
+	vt := VirtualTun{
+		Tnet:   tnet,
+		Logger: l.With("subsystem", "vtun"),
+		Dev:    nil,
+		Ctx:    ctx,
+	}
+
 	proxy := mixed.NewProxy(
 		mixed.WithListener(ln),
-		mixed.WithLogger(vt.Logger),
-		mixed.WithContext(vt.Ctx),
+		mixed.WithLogger(l),
+		mixed.WithContext(ctx),
 		mixed.WithUserHandler(func(request *statute.ProxyRequest) error {
 			return vt.generalHandler(request)
 		}),
